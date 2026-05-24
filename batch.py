@@ -10,15 +10,14 @@ from detection import crear_imagen_canal_color
 def process_single_image_v3(img_path, template, output_dir, roi_margin=230,
                               focal_mm=4.0, sensor_width_mm=5.6,
                               distancia_camara_plano_mm=110,
-                              apply_sharpening=False, sharpening_strength=1.0):
+                              apply_sharpening=False, sharpening_strength=1.0,
+                              calibration_method='distance',  # NUEVO
+                              reference_size_mm=None,         # NUEVO
+                              reference_size_px=None):        # NUEVO
     """
-    Pipeline completo v3.1 para una sola imagen.
-
-    Genera en output_dir:
-      · {name}_mascaras.jpg    — Panel con máscaras de C, M, Y
-                                 (imagen aislada + máscara cerca K por canal)
-      · {name}_resultado.jpg   — Crop original | crop anotado con posiciones CMYK
-      · {name}_calculos_mm.jpg — Panel blanco con los cálculos de distancias en mm
+    Pipeline completo v3.2 con dos métodos de calibración.
+    
+    calibration_method: 'distance' o 'reference_size'
     """
     filename    = os.path.basename(img_path)
     name_no_ext = os.path.splitext(filename)[0]
@@ -35,9 +34,25 @@ def process_single_image_v3(img_path, template, output_dir, roi_margin=230,
         img_bgr = sharpen_image(img_bgr, strength=sharpening_strength)
         print(f'  ✓ Sharpening aplicado (strength={sharpening_strength})')
 
-    image_width_px  = img_bgr.shape[1]
+    image_width_px  = max(img_bgr.shape[0], img_bgr.shape[1])
     tamano_pixel_mm = sensor_width_mm / image_width_px
-    mm_por_px = (tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
+    
+    # ✓ CALCULAR mm_por_px según el método elegido
+    if calibration_method == 'distance':
+        mm_por_px = (tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
+        calib_info = f'Dist. camara-plano: {distancia_camara_plano_mm} mm | Focal: {focal_mm} mm'
+    elif calibration_method == 'reference_size':
+        if reference_size_mm is None or reference_size_px is None:
+            print('  ⚠ ERROR: reference_size_mm y reference_size_px son requeridos')
+            return
+        mm_por_px = reference_size_mm / reference_size_px
+        calib_info = f'Ref. tamaño: {reference_size_mm} mm / {reference_size_px} px'
+    else:
+        print(f'  ⚠ Método de calibración inválido: {calibration_method}')
+        return
+
+    print(f'  Calibración: {calib_info}')
+    print(f'  Factor óptico: 1 px = {mm_por_px:.4f} mm')
 
     # ── PASO 1: Detectar K ──────────────────────────────────────────────
     lab_p = preprocess_image(img_bgr)
@@ -218,8 +233,7 @@ def process_single_image_v3(img_path, template, output_dir, roi_margin=230,
 
     info_lines = [
         f'Archivo: {filename}',
-        f'Factor optico: 1 px = {mm_por_px:.4f} mm'
-        f'  |  Dist. camara-plano: {distancia_camara_plano_mm} mm  |  Focal: {focal_mm} mm',
+        f'Factor optico: 1 px = {mm_por_px:.4f} mm  |  {calib_info}',
         '',
         '--- Desalineamiento respecto a K ---',
     ]

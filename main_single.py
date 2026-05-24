@@ -243,20 +243,17 @@ def guardar_imagen_calculos(img_bgr, cmyk_marks, k_marks, output_dir,
 # FUNCIONES DE PROCESAMIENTO
 # ================================================================
 
-def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=True):
+def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=True,
+                               calibration_method='distance',      
+                               reference_size_mm=None):             # ✓ Solo esto
     """
-    Procesa una imagen completa: detecta CMYK y guarda 3 archivos JPG.
+    Procesa una imagen con método de calibración configurable.
     
-    Parameters
-    ----------
-    img_path : str
-        Ruta a la imagen
-    template : ndarray
-        Plantilla de crosshair para detección de K
-    output_dir : str
-        Directorio donde guardar los resultados
-    show_diagnostics : bool
-        Si True, muestra visualizaciones matplotlib (para procesamiento single)
+    calibration_method:
+      - 'distance': usa distancia cámara-plano
+      - 'reference_size': usa tamaño de K conocido
+    
+    reference_size_mm: tamaño real de K en mm (ej: 10 para 1 cm)
     """
     filename    = os.path.basename(img_path)
     name_no_ext = os.path.splitext(filename)[0]
@@ -275,8 +272,51 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
 
     image_width_px  = img_bgr.shape[1]
     tamano_pixel_mm = sensor_width_mm / image_width_px
-    print(f'Imagen cargada: {img_bgr.shape[1]}×{img_bgr.shape[0]} px')
+    
+    # Primero detectar K para poder usarlo como referencia
+    lab_prep = preprocess_image(img_bgr)
+    L_full, _, _ = cv2.split(lab_prep)
 
+    k_detections = multi_scale_template_match(
+        L_full, template,
+        scales=np.arange(0.15, 3.2, 0.1),
+        threshold=0.35
+    )
+    k_marks = non_max_suppression(k_detections, radius=110)
+
+    print(f'\nMarcas K encontradas: {len(k_marks)}')
+    for i, (cx, cy, score, scale) in enumerate(k_marks):
+        print(f'  K-{i}: ({int(cx)},{int(cy)})  score={score:.3f}  scale={scale:.2f}')
+
+    if len(k_marks) == 0:
+        print('⚠ No se detectaron marcas K.')
+        return
+
+    # ✓ CALCULAR mm_por_px según el método elegido
+    if calibration_method == 'distance':
+        mm_por_px = (tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
+        calib_info = f'Dist. camara-plano: {distancia_camara_plano_mm} mm | Focal: {focal_mm} mm'
+    
+    elif calibration_method == 'reference_size':
+        if reference_size_mm is None:
+            print('  ⚠ ERROR: reference_size_mm es requerido para mode reference_size')
+            return
+        
+        # Calcular tamaño de K en píxeles (escala = tamaño detectado)
+        k_scale_px = k_marks[0][3]  # El scale es aproximadamente el tamaño en píxeles
+        # El template es de 101x101, así que:
+        k_size_px = 101 * k_scale_px
+        
+        mm_por_px = reference_size_mm / k_size_px
+        calib_info = f'Ref. tamaño K: {reference_size_mm} mm | Detectado: {k_size_px:.1f} px'
+    
+    else:
+        print(f'  ⚠ Método de calibración inválido: {calibration_method}')
+        return
+
+    print(f'Calibración: {calib_info}')
+    print(f'Factor óptico: 1 px = {mm_por_px:.4f} mm')
+    
     # =========================================================
     # PASO 1: Detectar marcas K
     # =========================================================
@@ -414,7 +454,9 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
         plt.show()
 
 
-def procesar_lote(input_dir='.', output_dir='resultados_v3'):
+def procesar_lote(input_dir='.', output_dir='resultados_v3',
+                  calibration_method='distance',
+                  reference_size_mm=None):
     """
     Procesa TODAS las imágenes .jpg de un directorio.
     Guarda 3 archivos JPG por imagen sin mostrar visualizaciones.
@@ -428,14 +470,18 @@ def procesar_lote(input_dir='.', output_dir='resultados_v3'):
     print(f'Imágenes encontradas: {len(image_paths)}')
 
     for img_path in image_paths:
-        procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=False)
+        procesar_y_guardar_imagen(img_path, template, output_dir, 
+                                 show_diagnostics=False,
+                                 calibration_method=calibration_method,
+                                 reference_size_mm=reference_size_mm)
     
-    # Asegurar que no quedan ventanas matplotlib abiertas
     plt.close('all')
     print(f'\n✓ Procesado lote completo. Resultados en: {output_dir}')
 
 
-def main_single(imagen_path='20250925_142228.jpg'):
+def main_single(imagen_path='20250925_142228.jpg',
+                calibration_method='distance',
+                reference_size_mm=None):
     """
     Procesa una sola imagen con visualización de diagnósticos.
     """
@@ -445,11 +491,13 @@ def main_single(imagen_path='20250925_142228.jpg'):
     )
     
     # Guarda en directorio actual si no existe
-    output_dir = 'resultados_v3'
+    output_dir = 'resultados_v5'
     os.makedirs(output_dir, exist_ok=True)
     
-    procesar_y_guardar_imagen(imagen_path, template, output_dir, show_diagnostics=True)
-
+    procesar_y_guardar_imagen(imagen_path, template, output_dir, 
+                             show_diagnostics=True,
+                             calibration_method=calibration_method,
+                             reference_size_mm=reference_size_mm)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -464,11 +512,24 @@ if __name__ == '__main__':
     parser.add_argument('--output_dir', default='resultados_v3',
                         help='Directorio de salida')
     
+    # ✓ NUEVOS ARGUMENTOS PARA CALIBRACIÓN
+    parser.add_argument('--calib_method', choices=['distance', 'reference_size'],
+                        default='distance',
+                        help='Método de calibración: distance (cámara-plano) o reference_size (tamaño de referencia)')
+    parser.add_argument('--ref_size_mm', type=float, default=None,
+                        help='Tamaño real del registro en mm (ej: 10 para 1 cm)')
+    parser.add_argument('--ref_size_px', type=float, default=None,
+                        help='Píxeles que ocupa el registro en la imagen')
+    
     args = parser.parse_args()
     
     if args.batch:
         # Modo batch: procesa todas las imágenes del directorio
-        procesar_lote(args.input_dir, args.output_dir)
+        procesar_lote(args.input_dir, args.output_dir, 
+                      calibration_method=args.calib_method,
+                      reference_size_mm=args.ref_size_mm)
     else:
         # Modo single: procesa una sola imagen con visualización
-        main_single(args.imagen)
+        main_single(args.imagen,
+                    calibration_method=args.calib_method,
+                    reference_size_mm=args.ref_size_mm)
