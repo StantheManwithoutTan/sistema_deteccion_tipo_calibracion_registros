@@ -88,13 +88,23 @@ foto con todos los colores no calibrados
 python main_single.py --imagen 20250925_142228.jpg
 
 
-python main_single.py --imagen foto.jpg
 
 # Con tamaño de referencia (marca K = 1 cm = 10 mm)
-python main_single.py --imagen foto.jpg --calib_method reference_size --ref_size_mm 10
+python main_single.py --imagen 20250925_142228.jpg --calib_method reference_size --ref_size_mm 10
 
 # Lote con referencia
-python main_single.py --batch --input_dir ./fotos --calib_method reference_size --ref_size_mm 10
+python main_single.py --batch --input_dir . --output_dir resultados_v4 --calib_method reference_size --ref_size_mm 10
+
+
+
+# Con distancia personalizada (150 mm)
+python main_single.py --imagen 20250925_142228.jpg --calib_method distance --distancia_mm 150
+
+# Con tamaño de referencia (marca K = 10 mm)
+python main_single.py --imagen 20250925_142228.jpg --calib_method reference_size --ref_size_mm 10
+
+# Batch con distancia personalizada
+python main_single.py --batch --input_dir ./fotos --calib_method distance --distancia_mm 120
 
 
 ```

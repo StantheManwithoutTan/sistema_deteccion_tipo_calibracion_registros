@@ -171,13 +171,17 @@ def guardar_imagen_resultado(img_bgr, cmyk_marks, k_marks, output_dir,
 
 
 def guardar_imagen_calculos(img_bgr, cmyk_marks, k_marks, output_dir, 
-                             name_no_ext, filename, roi_margin=230):
+                             name_no_ext, filename, roi_margin=230,
+                             distancia_camara_plano_mm_custom=None):  # ✓ AGREGAR PARÁMETRO
     """
     Genera y guarda el panel de cálculos: desalineamientos respecto a K y distancias entre pares.
     """
     image_width_px  = img_bgr.shape[1]
     tamano_pixel_mm = sensor_width_mm / image_width_px
-    mm_por_px = (sensor_width_mm * distancia_camara_plano_mm) / (focal_mm * image_width_px)
+    
+    # ✓ Usar distancia personalizada o la de config
+    dist_cam_plano = distancia_camara_plano_mm_custom if distancia_camara_plano_mm_custom is not None else distancia_camara_plano_mm
+    mm_por_px = (sensor_width_mm * dist_cam_plano) / (focal_mm * image_width_px)
 
     positions_mm = {}
     for ch in ['C', 'M', 'Y', 'K']:
@@ -186,7 +190,7 @@ def guardar_imagen_calculos(img_bgr, cmyk_marks, k_marks, output_dir,
 
     info_lines = [
         f'Archivo: {filename}',
-        f'Factor optico: 1 px = {mm_por_px:.4f} mm  |  Dist. camara-plano: {distancia_camara_plano_mm} mm  |  Focal: {focal_mm} mm',
+        f'Factor optico: 1 px = {mm_por_px:.4f} mm  |  Dist. camara-plano: {dist_cam_plano} mm  |  Focal: {focal_mm} mm',  # ✓ USAR dist_cam_plano
         '',
         '--- Desalineamiento respecto a K ---',
     ]
@@ -198,9 +202,9 @@ def guardar_imagen_calculos(img_bgr, cmyk_marks, k_marks, output_dir,
                 dx_px = positions_mm[ch][0] - kx
                 dy_px = positions_mm[ch][1] - ky
                 dist_px = np.hypot(dx_px, dy_px)
-                dx_mm   = (dx_px * tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
-                dy_mm   = (dy_px * tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
-                dist_mm = (dist_px * tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
+                dx_mm   = (dx_px * tamano_pixel_mm * dist_cam_plano) / focal_mm  # ✓ USAR dist_cam_plano
+                dy_mm   = (dy_px * tamano_pixel_mm * dist_cam_plano) / focal_mm  # ✓ USAR dist_cam_plano
+                dist_mm = (dist_px * tamano_pixel_mm * dist_cam_plano) / focal_mm  # ✓ USAR dist_cam_plano
                 info_lines.append(f'  {ch}-K:  Δx={dx_mm:+.3f} mm,  Δy={dy_mm:+.3f} mm,  dist={dist_mm:.3f} mm  ({dist_px:.1f} px)')
             else:
                 info_lines.append(f'  {ch}: no disponible')
@@ -213,7 +217,7 @@ def guardar_imagen_calculos(img_bgr, cmyk_marks, k_marks, output_dir,
             dx = positions_mm[n1][0] - positions_mm[n2][0]
             dy = positions_mm[n1][1] - positions_mm[n2][1]
             dist_px = np.hypot(dx, dy)
-            dist_mm = (dist_px * tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
+            dist_mm = (dist_px * tamano_pixel_mm * dist_cam_plano) / focal_mm  # ✓ USAR dist_cam_plano
             info_lines.append(f'  {n1}-{n2}:  {dist_mm:.3f} mm  ({dist_px:.1f} px)')
 
     font_c  = cv2.FONT_HERSHEY_SIMPLEX
@@ -245,7 +249,8 @@ def guardar_imagen_calculos(img_bgr, cmyk_marks, k_marks, output_dir,
 
 def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=True,
                                calibration_method='distance',      
-                               reference_size_mm=None):             # ✓ Solo esto
+                               reference_size_mm=None,
+                               distancia_camara_plano_mm_custom=None):  # ✓ NUEVO
     """
     Procesa una imagen con método de calibración configurable.
     
@@ -254,6 +259,7 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
       - 'reference_size': usa tamaño de K conocido
     
     reference_size_mm: tamaño real de K en mm (ej: 10 para 1 cm)
+    distancia_camara_plano_mm_custom: distancia cámara-plano en mm (si es None, usa config)
     """
     filename    = os.path.basename(img_path)
     name_no_ext = os.path.splitext(filename)[0]
@@ -272,6 +278,9 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
 
     image_width_px  = img_bgr.shape[1]
     tamano_pixel_mm = sensor_width_mm / image_width_px
+    
+    # ✓ Usar distancia personalizada o la de config
+    dist_cam_plano = distancia_camara_plano_mm_custom if distancia_camara_plano_mm_custom is not None else distancia_camara_plano_mm
     
     # Primero detectar K para poder usarlo como referencia
     lab_prep = preprocess_image(img_bgr)
@@ -294,8 +303,8 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
 
     # ✓ CALCULAR mm_por_px según el método elegido
     if calibration_method == 'distance':
-        mm_por_px = (tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
-        calib_info = f'Dist. camara-plano: {distancia_camara_plano_mm} mm | Focal: {focal_mm} mm'
+        mm_por_px = (tamano_pixel_mm * dist_cam_plano) / focal_mm
+        calib_info = f'Dist. camara-plano: {dist_cam_plano} mm | Focal: {focal_mm} mm'
     
     elif calibration_method == 'reference_size':
         if reference_size_mm is None:
@@ -379,7 +388,8 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
     guardar_imagen_resultado(img_bgr, cmyk_marks, k_marks, 
                             output_dir, name_no_ext, filename)
     guardar_imagen_calculos(img_bgr, cmyk_marks, k_marks, 
-                           output_dir, name_no_ext, filename)
+                           output_dir, name_no_ext, filename,
+                           distancia_camara_plano_mm_custom=dist_cam_plano)  # ✓ PASAR DISTANCIA
 
     n_detected = sum(1 for v in cmyk_marks.values() if len(v) > 0)
     print(f'  ✓ Canales detectados: {n_detected}/4')
@@ -456,7 +466,8 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
 
 def procesar_lote(input_dir='.', output_dir='resultados_v3',
                   calibration_method='distance',
-                  reference_size_mm=None):
+                  reference_size_mm=None,
+                  distancia_camara_plano_mm_custom=None):  # ✓ NUEVO
     """
     Procesa TODAS las imágenes .jpg de un directorio.
     Guarda 3 archivos JPG por imagen sin mostrar visualizaciones.
@@ -473,7 +484,8 @@ def procesar_lote(input_dir='.', output_dir='resultados_v3',
         procesar_y_guardar_imagen(img_path, template, output_dir, 
                                  show_diagnostics=False,
                                  calibration_method=calibration_method,
-                                 reference_size_mm=reference_size_mm)
+                                 reference_size_mm=reference_size_mm,
+                                 distancia_camara_plano_mm_custom=distancia_camara_plano_mm_custom)  # ✓ NUEVO
     
     plt.close('all')
     print(f'\n✓ Procesado lote completo. Resultados en: {output_dir}')
@@ -481,7 +493,8 @@ def procesar_lote(input_dir='.', output_dir='resultados_v3',
 
 def main_single(imagen_path='20250925_142228.jpg',
                 calibration_method='distance',
-                reference_size_mm=None):
+                reference_size_mm=None,
+                distancia_camara_plano_mm_custom=None):  # ✓ NUEVO
     """
     Procesa una sola imagen con visualización de diagnósticos.
     """
@@ -497,7 +510,8 @@ def main_single(imagen_path='20250925_142228.jpg',
     procesar_y_guardar_imagen(imagen_path, template, output_dir, 
                              show_diagnostics=True,
                              calibration_method=calibration_method,
-                             reference_size_mm=reference_size_mm)
+                             reference_size_mm=reference_size_mm,
+                             distancia_camara_plano_mm_custom=distancia_camara_plano_mm_custom)  # ✓ AGREGAR ESTO
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -517,9 +531,9 @@ if __name__ == '__main__':
                         default='distance',
                         help='Método de calibración: distance (cámara-plano) o reference_size (tamaño de referencia)')
     parser.add_argument('--ref_size_mm', type=float, default=None,
-                        help='Tamaño real del registro en mm (ej: 10 para 1 cm)')
-    parser.add_argument('--ref_size_px', type=float, default=None,
-                        help='Píxeles que ocupa el registro en la imagen')
+                        help='Tamaño real de K en mm (ej: 10 para 1 cm)')
+    parser.add_argument('--distancia_mm', type=float, default=None,
+                        help='Distancia cámara-plano en mm (solo para --calib_method distance)')
     
     args = parser.parse_args()
     
@@ -527,9 +541,11 @@ if __name__ == '__main__':
         # Modo batch: procesa todas las imágenes del directorio
         procesar_lote(args.input_dir, args.output_dir, 
                       calibration_method=args.calib_method,
-                      reference_size_mm=args.ref_size_mm)
+                      reference_size_mm=args.ref_size_mm,
+                      distancia_camara_plano_mm_custom=args.distancia_mm)  # ✓ NUEVO
     else:
         # Modo single: procesa una sola imagen con visualización
         main_single(args.imagen,
                     calibration_method=args.calib_method,
-                    reference_size_mm=args.ref_size_mm)
+                    reference_size_mm=args.ref_size_mm,
+                    distancia_camara_plano_mm_custom=args.distancia_mm)  # ✓ NUEVO
