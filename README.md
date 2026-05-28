@@ -97,6 +97,9 @@ python main_single.py --batch --input_dir . --output_dir resultados_v4 --calib_m
 
 
 
+# Procesar todos (por defecto)
+python main_single.py --imagen 20250925_142228.jpg
+
 # Con distancia personalizada (150 mm)
 python main_single.py --imagen 20250925_142228.jpg --calib_method distance --distancia_mm 150
 
@@ -105,6 +108,16 @@ python main_single.py --imagen 20250925_142228.jpg --calib_method reference_size
 
 # Batch con distancia personalizada
 python main_single.py --batch --input_dir ./fotos --calib_method distance --distancia_mm 120
+
+
+# Procesar solo Cyan y Magenta
+python main_single.py --imagen 20250925_142228.jpg --canales C,M
+
+# Procesar solo Amarillo
+python main_single.py --imagen 20250925_142228.jpg --canales Y
+
+
+
 
 
 ```

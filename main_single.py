@@ -250,7 +250,8 @@ def guardar_imagen_calculos(img_bgr, cmyk_marks, k_marks, output_dir,
 def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=True,
                                calibration_method='distance',      
                                reference_size_mm=None,
-                               distancia_camara_plano_mm_custom=None):  # ✓ NUEVO
+                               distancia_camara_plano_mm_custom=None,
+                               canales_a_procesar=['C', 'M', 'Y']):  # ✓ NUEVO
     """
     Procesa una imagen con método de calibración configurable.
     
@@ -260,6 +261,8 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
     
     reference_size_mm: tamaño real de K en mm (ej: 10 para 1 cm)
     distancia_camara_plano_mm_custom: distancia cámara-plano en mm (si es None, usa config)
+
+    canales_a_procesar: lista de canales a procesar (ej: ['C', 'M'] para solo Cyan y Magenta)
     """
     filename    = os.path.basename(img_path)
     name_no_ext = os.path.splitext(filename)[0]
@@ -362,6 +365,12 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
     diag_por_canal = {}
 
     for ch_name, ch_info in CMY_CROP_RANGES.items():
+        # ✓ NUEVA CONDICIÓN: saltar si el canal no está en la lista
+        if ch_name not in canales_a_procesar:
+            print(f"  ⊘ Canal {ch_name} omitido (no incluido en análisis)")
+            cmyk_marks[ch_name] = []
+            continue
+            
         marks_canal, diag_data = detectar_canal_con_imagen_separada(
             img_bgr, ch_name, ch_info, k_marks,
             template, roi_margin=230,
@@ -494,7 +503,8 @@ def procesar_lote(input_dir='.', output_dir='resultados_v3',
 def main_single(imagen_path='20250925_142228.jpg',
                 calibration_method='distance',
                 reference_size_mm=None,
-                distancia_camara_plano_mm_custom=None):  # ✓ NUEVO
+                distancia_camara_plano_mm_custom=None,
+                canales_a_procesar=['C', 'M', 'Y']):  # ✓ NUEVO
     """
     Procesa una sola imagen con visualización de diagnósticos.
     """
@@ -511,7 +521,8 @@ def main_single(imagen_path='20250925_142228.jpg',
                              show_diagnostics=True,
                              calibration_method=calibration_method,
                              reference_size_mm=reference_size_mm,
-                             distancia_camara_plano_mm_custom=distancia_camara_plano_mm_custom)  # ✓ AGREGAR ESTO
+                             distancia_camara_plano_mm_custom=distancia_camara_plano_mm_custom,
+                             canales_a_procesar=canales_a_procesar)  # ✓ NUEVO
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -535,7 +546,14 @@ if __name__ == '__main__':
     parser.add_argument('--distancia_mm', type=float, default=None,
                         help='Distancia cámara-plano en mm (solo para --calib_method distance)')
     
+    # ✓ NUEVO: argumento para seleccionar canales
+    parser.add_argument('--canales', default='C,M,Y',
+                        help='Canales a procesar (ej: C,M,Y / C,Y / M, etc.)')
+    
     args = parser.parse_args()
+    
+    # Procesar string de canales
+    canales_a_procesar = [ch.strip().upper() for ch in args.canales.split(',')]
     
     if args.batch:
         # Modo batch: procesa todas las imágenes del directorio
@@ -548,4 +566,5 @@ if __name__ == '__main__':
         main_single(args.imagen,
                     calibration_method=args.calib_method,
                     reference_size_mm=args.ref_size_mm,
-                    distancia_camara_plano_mm_custom=args.distancia_mm)  # ✓ NUEVO
+                    distancia_camara_plano_mm_custom=args.distancia_mm,
+                    canales_a_procesar=canales_a_procesar)  # ✓ NUEVO
