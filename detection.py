@@ -3,8 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
-from config import CLUSTERING_SIGMA
-from image_utils import multi_scale_template_match
+from config import CLUSTERING_SIGMA, WHITE_BG_NORMALIZE, WHITE_L_THRESHOLD, \
+                   WHITE_TOLERANCE_MIN, WHITE_TOLERANCE_MAX, WHITE_SIGMA_FACTOR
+from image_utils import multi_scale_template_match, normalize_white_background
 
 
 def get_representative_color(mask, bgr_img):
@@ -141,6 +142,7 @@ def crear_imagen_canal_color(crop_bgr, ch_name, ch_info, k_local_cx, k_local_cy,
         mask_lab_bgr = cv2.bitwise_and(  # ← Asignar a mask_lab_bgr directamente
             cv2.inRange(b_ch, np.array([132]), np.array([255])),
             cv2.inRange(a_ch, np.array([110]), np.array([145])))
+
         color_mask = mask_lab_bgr.copy()
 
     # --- Limpieza morfológica ---
@@ -199,6 +201,17 @@ def detectar_canal_con_imagen_separada(img_bgr, ch_name, ch_info, k_marks,
         crop_h, crop_w = crop_bgr.shape[:2]
         k_local_cx  = int(kcx) - rx1
         k_local_cy  = int(kcy) - ry1
+
+                # ── PASO 0.5: Normalizar fondo blanco (v3.2+) ──
+        if WHITE_BG_NORMALIZE:
+            crop_bgr = normalize_white_background(
+                crop_bgr,
+                l_threshold=WHITE_L_THRESHOLD,
+                min_tolerance=WHITE_TOLERANCE_MIN,
+                max_tolerance=WHITE_TOLERANCE_MAX,
+                sigma_factor=WHITE_SIGMA_FACTOR
+            )
+            print(f"  │  ✓ Fondo blanco normalizado")
 
         # ── PASO 1: Imagen separada + máscaras diagnóstico ──
         img_isolated, mask_full, mask_near, crop_enhanced, diag_masks = crear_imagen_canal_color(

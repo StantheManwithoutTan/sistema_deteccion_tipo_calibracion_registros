@@ -21,7 +21,7 @@ CMY_CROP_RANGES = {
         'label_color': (255, 0, 255),
         'nombre': 'Magenta',
         'color_display': (200, 0, 200),
-        'usar_lab_bgr': True,  # v3.2: activa componente LAB/BGR para magenta
+        'usar_lab_bgr': True,
     },
     'Y': {
         'hsv_ranges': [
@@ -59,3 +59,12 @@ SHARPENING_STRENGTH = 1.0
 # 'mediana'           : mediana clásica (legacy v3.1)
 CLUSTERING_METHOD = 'promedio_ponderado'
 CLUSTERING_SIGMA  = 40.0   # sigma en píxeles
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NORMALIZACIÓN DE FONDO BLANCO (v3.2+)
+# ═══════════════════════════════════════════════════════════════════════════
+WHITE_BG_NORMALIZE = True              # Activar/desactivar normalización
+WHITE_L_THRESHOLD = 150                # Threshold de luminancia (L en LAB)
+WHITE_TOLERANCE_MIN = 30               # Tolerancia mínima (RGB equivalente)
+WHITE_TOLERANCE_MAX = 50               # Tolerancia máxima (RGB equivalente)
+WHITE_SIGMA_FACTOR = 1.0               # Factor multiplicador de desviación estándar

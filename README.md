@@ -117,7 +117,7 @@ python main_single.py --imagen 20250925_142228.jpg --canales C,M
 python main_single.py --imagen 20250925_142228.jpg --canales Y
 
 
-
+python main_single.py --imagen 20260315_235619.jpg --canales Y
 
 
 ```

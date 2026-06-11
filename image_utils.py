@@ -91,3 +91,106 @@ def non_max_suppression(detections, radius):
         if not is_duplicate:
             kept.append(det)
     return kept[:1]
+
+
+def normalize_white_background(crop_bgr, l_threshold=150, min_tolerance=15, 
+                               max_tolerance=50, sigma_factor=1.0):
+    """
+    Normaliza el fondo blanco de un crop detectando el color más prominente
+    y reemplazando píxeles cercanos a ese color con blanco puro.
+    
+    Estrategia:
+      1. Convertir a LAB
+      2. Filtrar píxeles claros (L > l_threshold)
+      3. Crear histograma de píxeles claros
+      4. Encontrar color más frecuente (bin más poblado)
+      5. Calcular media y desviación estándar de ese cluster
+      6. Crear máscara de píxeles dentro de σ (con límites min/max)
+      7. Reemplazar con blanco puro
+    
+    Parámetros
+    ----------
+    crop_bgr : imagen BGR (uint8)
+    l_threshold : mínima luminancia para considerar píxel "claro" (0-255)
+    min_tolerance : tolerancia mínima en RGB equivalente
+    max_tolerance : tolerancia máxima en RGB equivalente
+    sigma_factor : multiplicador de desviación estándar (1.0 = ±σ)
+    
+    Retorna
+    -------
+    crop_normalized : imagen BGR con fondo blanco normalizado
+    """
+    crop_h, crop_w = crop_bgr.shape[:2]
+    
+    # --- Convertir a LAB ---
+    crop_lab = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2LAB)
+    L_ch, a_ch, b_ch = cv2.split(crop_lab)
+    
+    # --- Filtrar píxeles claros (L > threshold) ---
+    mask_bright = L_ch > l_threshold
+    if not np.any(mask_bright):
+        # Si no hay píxeles claros, retornar sin cambios
+        return crop_bgr.copy()
+    
+    # --- Crear histograma de píxeles claros en espacio (a*, b*) ---
+    # Usamos 32 bins en cada dimensión para a* y b*
+    a_bright = a_ch[mask_bright]
+    b_bright = b_ch[mask_bright]
+    
+    hist_2d, a_edges, b_edges = np.histogram2d(
+        a_bright, b_bright, bins=[32, 32], range=[[0, 256], [0, 256]]
+    )
+    
+    # --- Encontrar bin más frecuente ---
+    max_bin_idx = np.unravel_index(np.argmax(hist_2d), hist_2d.shape)
+    a_bin_idx, b_bin_idx = max_bin_idx
+    
+    # Centro del bin más frecuente (aproximadamente)
+    a_center = (a_edges[a_bin_idx] + a_edges[a_bin_idx + 1]) / 2
+    b_center = (b_edges[b_bin_idx] + b_edges[b_bin_idx + 1]) / 2
+    
+    # --- Calcular media y desviación estándar del cluster ---
+    # Píxeles dentro de ±5 bins del centro
+    a_tol = (a_edges[1] - a_edges[0]) * 2.5  # ~±2.5 bins = 20 unidades
+    b_tol = (b_edges[1] - b_edges[0]) * 2.5
+    
+    cluster_mask = (
+        (np.abs(a_ch.astype(np.float32) - a_center) < a_tol) &
+        (np.abs(b_ch.astype(np.float32) - b_center) < b_tol) &
+        (L_ch > l_threshold)
+    )
+    
+    if not np.any(cluster_mask):
+        return crop_bgr.copy()
+    
+    # Media del cluster
+    a_mean = np.mean(a_ch[cluster_mask])
+    b_mean = np.mean(b_ch[cluster_mask])
+    
+    # Desviación estándar
+    a_std = np.std(a_ch[cluster_mask])
+    b_std = np.std(b_ch[cluster_mask])
+    L_std = np.std(L_ch[cluster_mask])
+    
+    # --- Convertir σ en LAB a tolerancia en RGB equivalente ---
+    # Aproximación: σ_lab ≈ σ_rgb * factor
+    # (usar promedios de las desviaciones)
+    sigma_lab_avg = (a_std + b_std) / 2.0
+    tolerance_rgb = sigma_lab_avg * sigma_factor
+    
+    # Aplicar límites
+    tolerance_rgb = np.clip(tolerance_rgb, min_tolerance, max_tolerance)
+    
+    # --- Crear máscara: píxeles dentro de ±tolerance en LAB ---
+    dist_to_mean = np.sqrt(
+        ((a_ch.astype(np.float32) - a_mean) ** 2) +
+        ((b_ch.astype(np.float32) - b_mean) ** 2)
+    )
+    
+    mask_to_normalize = (dist_to_mean <= tolerance_rgb) & (L_ch > l_threshold)
+    
+    # --- Reemplazar con blanco puro ---
+    crop_normalized = crop_bgr.copy()
+    crop_normalized[mask_to_normalize] = [255, 255, 255]  # BGR: blanco
+    
+    return crop_normalized
