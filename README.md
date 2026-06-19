@@ -130,7 +130,7 @@ igual que ejecutar el notebook celda por celda.
 ```bash
 python main_batch.py --input_dir . --output_dir resultados_v3
 
-python main_single.py --batch --input_dir . --output_dir ./resultados_v4
+python main_single.py --batch --input_dir . --output_dir ./resultados_grayscale_magenta
 ```
 
 Guarda en `resultados_v3/` tres archivos por imagen:

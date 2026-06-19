@@ -22,6 +22,7 @@ CMY_CROP_RANGES = {
         'nombre': 'Magenta',
         'color_display': (200, 0, 200),
         'usar_lab_bgr': True,
+        'gray_threshold': 30,
     },
     'Y': {
         'hsv_ranges': [
