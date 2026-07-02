@@ -69,3 +69,15 @@ WHITE_L_THRESHOLD = 150                # Threshold de luminancia (L en LAB)
 WHITE_TOLERANCE_MIN = 30               # Tolerancia mínima (RGB equivalente)
 WHITE_TOLERANCE_MAX = 50               # Tolerancia máxima (RGB equivalente)
 WHITE_SIGMA_FACTOR = 1.0               # Factor multiplicador de desviación estándar
+
+
+SIZE_ADAPTIVE_ENABLED = True
+BASE_TEMPLATE_SIZE = 101
+BASE_SEARCH_RADIUS = 110
+BASE_ROI_MARGIN = 230
+BASE_NMS_RADIUS = 110
+MIN_TEMPLATE_SIZE_PX = 20
+MIN_ROI_MARGIN        = 150   # px — nunca menos que esto
+MIN_SEARCH_RADIUS     = 80    # px — nunca menos que esto
+PX_MIN_ACCEPT_LOW     = 200
+SCORE_NORMALIZER_LOW  = 50

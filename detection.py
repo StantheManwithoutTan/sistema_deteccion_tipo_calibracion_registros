@@ -3,8 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
-from config import CLUSTERING_SIGMA, WHITE_BG_NORMALIZE, WHITE_L_THRESHOLD, \
-                   WHITE_TOLERANCE_MIN, WHITE_TOLERANCE_MAX, WHITE_SIGMA_FACTOR
+from config import (CLUSTERING_SIGMA, WHITE_BG_NORMALIZE, WHITE_L_THRESHOLD,
+                    WHITE_TOLERANCE_MIN, WHITE_TOLERANCE_MAX, WHITE_SIGMA_FACTOR,
+                    SIZE_ADAPTIVE_ENABLED, MIN_ROI_MARGIN,
+MIN_SEARCH_RADIUS, PX_MIN_ACCEPT_LOW, SCORE_NORMALIZER_LOW, CMY_CROP_RANGES)
+
 from image_utils import multi_scale_template_match, normalize_white_background
 
 
@@ -182,6 +185,8 @@ def crear_imagen_canal_color(crop_bgr, ch_name, ch_info, k_local_cx, k_local_cy,
 def detectar_canal_con_imagen_separada(img_bgr, ch_name, ch_info, k_marks,
                                         template, roi_margin=230,
                                         search_radius=110, threshold=0.2,
+                                        px_min_accept=800,
+                                        score_normalizer=300,
                                         show_plots=False):  
     """
     Para cada marca K detectada:
@@ -282,7 +287,7 @@ def detectar_canal_con_imagen_separada(img_bgr, ch_name, ch_info, k_marks,
             weights = np.exp(-dists / 20.0)
             best_cx = int(np.average(xs, weights=weights)) + rx1
             best_cy = int(np.average(ys, weights=weights)) + ry1
-            best_score  = round(min(px_count / 300.0, 1.0), 3)
+            best_score = round(min(px_count / score_normalizer, 1.0), 3)
             best_scale  = kscale
             method_used = 'centroide_ponderado'
 
@@ -309,8 +314,19 @@ def detectar_canal_con_imagen_separada(img_bgr, ch_name, ch_info, k_marks,
                        cv2.MARKER_CROSS, 16, 1)
         local_det_cx = int(best_cx) - rx1
         local_det_cy = int(best_cy) - ry1
+        if len(xs) > 3:
+            # centro local de la marca detectada
+            xc = int(best_cx - rx1)
+            yc = int(best_cy - ry1)
+            dists = np.hypot(xs - xc, ys - yc)
+            real_radius = int(np.percentile(dists, 85)) + 2
+            detect_radius = max(int(40 * best_scale), real_radius)
+            print(f"best_scale: %d. real_radius: %d", 40 * best_scale, real_radius)
+        else:
+            detect_radius = int(40 * best_scale)
+
         cv2.circle(overlay_near_colored, (local_det_cx, local_det_cy),
-                   int(40 * best_scale), draw_color_bgr, 2)
+                detect_radius, draw_color_bgr, 2)
         cv2.circle(overlay_near_colored, (local_det_cx, local_det_cy), 5, draw_color_bgr, -1)
 
         # ── PASO 5: Visualización — Diagnóstico de máscaras (vista V2-style) ──
@@ -562,10 +578,23 @@ def procesar_imagen_completa(img_bgr, template, roi_margin=230, search_radius=11
     k_detections = multi_scale_template_match(L_full, template, 
                                               scales=np.arange(0.15, 3.2, 0.1),
                                               threshold=0.35)
+    nms_radius = int(110 * np.sqrt(k_detections[0][3])) if SIZE_ADAPTIVE_ENABLED and k_detections else 110
     k_marks = non_max_suppression(k_detections, radius=110)
     
     if len(k_marks) == 0:
         return None, None, k_marks
+
+    if SIZE_ADAPTIVE_ENABLED:
+        avg_k_score = np.mean([km[3] for km in k_marks])
+        f = np.sqrt(avg_kscale)
+        dyn_roi_margin    = max(MIN_ROI_MARGIN,    int(230 * f))
+        dyn_search_radius    = max(MIN_SEARCH_RADIUS, int(110 * f))
+        dyn_pixel_accept_amount    = max(PX_MIN_ACCEPT_LOW, int(800 * avg_k_score))
+        dyn_normalizer_score  = max(SCORE_NORMALIZER_LOW, int(300 * avg_k_score))
+    else:
+        # valores defectos en el caso que la deteccion inicial no da una calificacion de K utilizable
+        dyn_roi_margin, dyn_search_radius, dyn_pixel_accept_amount, dyn_normalizer_score = roi_margin, search_radius, 800, 300
+
     
     # PASO 2: Detectar CMY
     cmyk_marks = {'K': k_marks}
@@ -573,13 +602,13 @@ def procesar_imagen_completa(img_bgr, template, roi_margin=230, search_radius=11
     
     for ch_name, ch_info in CMY_CROP_RANGES.items():
         marks_canal, diag_data = detectar_canal_con_imagen_separada(
-            img_bgr, ch_name, ch_info, k_marks,
-            template, roi_margin=roi_margin,
-            search_radius=search_radius, threshold=0.2
+            img_bgr, ch_name, ch_info, k_marks, template,
+            roi_margin=dyn_roi_margin, search_radius=dyn_search_radius, threshold=0.1,
+            px_min_accept=dyn_pixel_accept_amount, score_normalizer=dyn_normalizer_score,
         )
         
         # Filtrar por 1000 píxeles
-        if len(diag_data) > 0 and diag_data[0].get('px_count', 0) >= 1000:
+        if len(diag_data) > 0 and diag_data[0].get('px_count', 0) >= dyn_pixel_accept_amount:
             cmyk_marks[ch_name] = marks_canal
             diag_por_canal[ch_name] = diag_data
         else:

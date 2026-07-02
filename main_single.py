@@ -22,7 +22,8 @@ import matplotlib.pyplot as plt
 from config import (
     CMY_CROP_RANGES, COLORS_LABEL, offsets_label,
     distancia_camara_plano_mm, focal_mm, sensor_width_mm,
-    APPLY_SHARPENING, SHARPENING_STRENGTH,
+    APPLY_SHARPENING, SHARPENING_STRENGTH, SIZE_ADAPTIVE_ENABLED, MIN_ROI_MARGIN,
+MIN_SEARCH_RADIUS, 
 )
 from image_utils import (
     sharpen_image, preprocess_image,
@@ -30,7 +31,6 @@ from image_utils import (
 )
 from detection import (
     detectar_canal_con_imagen_separada,
-    get_representative_color,
     generar_diagnostico_mascaras,
 )
 
@@ -294,7 +294,13 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
         scales=np.arange(0.15, 3.2, 0.1),
         threshold=0.35
     )
-    k_marks = non_max_suppression(k_detections, radius=110)
+    # dyn_nms_radius ANTES de NMS
+    if SIZE_ADAPTIVE_ENABLED and k_detections:
+        dyn_nms_radius = int(110 * np.sqrt(k_detections[0][3]))
+    else:
+        dyn_nms_radius = 110
+    k_marks = non_max_suppression(k_detections, radius=dyn_nms_radius)
+
 
     print(f'\nMarcas K encontradas: {len(k_marks)}')
     for i, (cx, cy, score, scale) in enumerate(k_marks):
@@ -336,16 +342,6 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
     print('  PASO 1: Detectar marcas K (negro) con template matching')
     print('=' * 60)
 
-    lab_prep = preprocess_image(img_bgr)
-    L_full, _, _ = cv2.split(lab_prep)
-
-    k_detections = multi_scale_template_match(
-        L_full, template,
-        scales=np.arange(0.15, 3.2, 0.1),
-        threshold=0.35
-    )
-    k_marks = non_max_suppression(k_detections, radius=110)
-
     print(f'\nMarcas K encontradas: {len(k_marks)}')
     for i, (cx, cy, score, scale) in enumerate(k_marks):
         print(f'  K-{i}: ({int(cx)},{int(cy)})  score={score:.3f}  scale={scale:.2f}')
@@ -353,6 +349,15 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
     if len(k_marks) == 0:
         print('⚠ No se detectaron marcas K.')
         return
+
+    if SIZE_ADAPTIVE_ENABLED:
+        avg_kscale = np.mean([km[3] for km in k_marks])
+        f = np.sqrt(avg_kscale)
+        dyn_roi_margin    = max(MIN_ROI_MARGIN,    int(230 * f))
+        dyn_search_radius = max(MIN_SEARCH_RADIUS, int(110 * f))
+    else:
+        dyn_roi_margin    = 230
+        dyn_search_radius = 110
 
     # =========================================================
     # PASO 2: Detectar C, M, Y
@@ -373,18 +378,18 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
             
         marks_canal, diag_data = detectar_canal_con_imagen_separada(
             img_bgr, ch_name, ch_info, k_marks,
-            template, roi_margin=230,
-            search_radius=110, threshold=0.2,
+            template, dyn_roi_margin,
+            dyn_search_radius, threshold=0.2,
             show_plots=show_diagnostics 
         )
         
-        # Filtrar: solo incluir si >= 1000 píxeles
-        if len(diag_data) > 0 and diag_data[0].get('px_count', 0) >= 1000:
+        # Filtrar: solo incluir si >= 800 píxeles
+        if len(diag_data) > 0 and diag_data[0].get('px_count', 0) >= 800:
             cmyk_marks[ch_name] = marks_canal
             diag_por_canal[ch_name] = diag_data
         else:
             px_count = diag_data[0].get('px_count', 0) if len(diag_data) > 0 else 0
-            print(f"  ⚠ Canal {ch_name} descartado: {px_count} < 1000 píxeles")
+            print(f"  ⚠ Canal {ch_name} descartado: {px_count} < 800 píxeles")
             cmyk_marks[ch_name] = []
 
     # =========================================================

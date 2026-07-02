@@ -98,7 +98,7 @@ python main_single.py --batch --input_dir . --output_dir resultados_v4 --calib_m
 
 
 # Procesar todos (por defecto)
-python main_single.py --imagen 20250925_142228.jpg
+python main_single.py --imagen WIN_20260619_07_33_18_Pro.jpg
 
 # Con distancia personalizada (150 mm)
 python main_single.py --imagen 20250925_142228.jpg --calib_method distance --distancia_mm 150
