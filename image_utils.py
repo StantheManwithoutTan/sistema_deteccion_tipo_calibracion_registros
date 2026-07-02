@@ -50,13 +50,13 @@ def create_crosshair_template(size=101, ring_radius=40, ring_thickness=8,
 def multi_scale_template_match(gray, template, scales=None, threshold=0.5):
     """Template matching a múltiples escalas. Devuelve lista de (x, y, score, scale)."""
     if scales is None:
-        scales = np.arange(0.3, 2.5, 0.1)
+        scales = generar_escalas_log(0.3, 2.5, 20)
     detections = []
     th, tw = template.shape[:2]
     for s in scales:
         new_w = int(tw * s)
         new_h = int(th * s)
-        if new_w < 20 or new_h < 20:
+        if new_w < 12 or new_h < 12:  # antes era 20
             continue
         if new_w > gray.shape[1] or new_h > gray.shape[0]:
             continue
@@ -91,6 +91,12 @@ def non_max_suppression(detections, radius):
         if not is_duplicate:
             kept.append(det)
     return kept[:1]
+
+
+# En image_utils.py, cambiar default y/o crear función auxiliar
+def generar_escalas_log(start=0.15, stop=3.2, num=25):
+    return np.logspace(np.log10(start), np.log10(stop), num=num)
+
 
 
 def normalize_white_background(crop_bgr, l_threshold=150, min_tolerance=15, 
