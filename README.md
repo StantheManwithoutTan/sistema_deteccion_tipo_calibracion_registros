@@ -98,7 +98,7 @@ python main_single.py --batch --input_dir . --output_dir resultados_v4 --calib_m
 
 
 # Procesar todos (por defecto)
-python main_single.py --imagen WIN_20260619_07_33_18_Pro.jpg
+python main_single.py --imagen foto_real_empresa.jpg
 
 # Con distancia personalizada (150 mm)
 python main_single.py --imagen 20250925_142228.jpg --calib_method distance --distancia_mm 150
@@ -181,3 +181,74 @@ Todos los parámetros principales están en `config.py`:
 | `sensor_width_mm`      | Ancho del sensor en mm                           |
 | `CLUSTERING_SIGMA`     | Sigma del promedio ponderado para posición final |
 | `CMY_CROP_RANGES`      | Rangos HSV por canal (C, M, Y)                   |# sistema_deteccion_tipo_calibracion_registros
+
+
+
+
+
+
+Resumen del pipeline
+
+El flujo real de detección es este:
+
+1. Se preprocesa la imagen para mejorar el contraste.
+2. Se detecta la marca negra de referencia K con template matching.
+3. Con la posición de K se recorta una región de interés alrededor de cada marca.
+4. Dentro de ese recorte se construyen máscaras por canal de color C, M y Y.
+5. La detección se restringe a una zona cercana a K para evitar falsos positivos.
+6. Se estima la posición final de cada canal combinando template matching y refinamiento geométrico.
+7. Se calcula el radio visual de la marca y se genera salida diagnóstica.
+8. Se convierten desplazamientos de píxeles a milímetros para evaluar la calibración.
+
+
+Qué hace cada archivo y cada función
+
+En color_analysis.py están las funciones que resumen el color y ayudan a refinar la posición.
+
+get_representative_color(mask, bgr_img): 
+    - calcula el color representativo de los píxeles detectados dentro de una máscara. Toma la mediana de B, G y R, y devuelve ese color en RGB, su equivalente HSV y el número de píxeles usados.
+weighted_median(values, weights): 
+    - calcula una mediana ponderada, dando más peso a los píxeles más cercanos al centro esperado. Se usa como refinamiento robusto de la posición.
+    - analyze_hue_range(crop_hsv, mask_near, ch_info): analiza la distribución del tono Hue en los píxeles detectados. Devuelve mínimos, máximos, media, mediana, moda, desviación estándar y saturación/brillo medios para comparar lo observado con los rangos configurados.
+
+
+En color_masks.py se construyen las máscaras de color para cada canal.
+
+crear_imagen_canal_color(crop_bgr, ch_name, ch_info, k_local_cx, k_local_cy, search_radius=110): es una de las funciones más importantes del pipeline. Toma el recorte alrededor de K y genera:
+
+- una imagen aislada del canal de color,
+- una máscara completa del color,
+- una máscara recortada alrededor de K,
+- una imagen mejorada con LAB + CLAHE, máscaras intermedias de diagnóstico.
+
+La lógica cambia según el canal:
+
+    - Para C usa reglas en HSV + LAB + comparativas BGR.
+    - Para M usa principalmente HSV y un refuerzo en escala de grises.
+    - Para Y usa HSV y una validación adicional en LAB.
+
+
+En position.py se estima la ubicación final de cada marca.
+
+- detectar_posicion(mask_near, img_isolated, template, kcx, kcy, kscale, rx1, ry1, k_local_cx, k_local_cy, threshold=0.2, score_normalizer=300, px_count=0): intenta localizar la marca con tres niveles de decisión:
+
+1. primero, template matching sobre la imagen aislada,
+2. si no encuentra suficiente evidencia, usa un centroide ponderado,
+3. finalmente refina la posición con mediana ponderada.
+4. Devuelve la posición global, score, escala, método usado y los píxeles detectados.
+
+- compute_detect_radius(xs, ys, best_cx, best_cy, best_scale, rx1, ry1): calcula el radio visual de la marca detectada usando el percentil 85 de las distancias de los píxeles al centro estimado.
+
+En visualization.py se generan las salidas visuales de diagnóstico.
+
+- crear_overlay_canal(crop_bgr, mask_near, px_count, k_local_cx, k_local_cy, search_radius, draw_color_bgr, local_det_cx, local_det_cy, detect_radius): crea un overlay donde se pintan los píxeles detectados, el radio de búsqueda, la cruz de K y el círculo de la detección final.
+- plot_diagnostico_canal(...): arma una figura de diagnóstico por canal con el crop original, la versión preprocesada, la imagen aislada, el overlay, las máscaras y un histograma de Hue.
+- generar_diagnostico_mascaras(diag_por_canal, preprocesada_titulo='PREPROCESADA', show_plot=True): genera una figura resumen para los canales C, M y Y en conjunto.
+
+
+En pipeline.py está el flujo orquestador.
+
+- detectar_canal_con_imagen_separada(...): procesa un canal específico dentro del crop alrededor de K. Hace el recorte, la normalización opcional del fondo blanco, crea la máscara del canal, analiza color, detecta posición, calcula radio y prepara todos los datos de diagnóstico.
+- procesar_imagen_completa(img_bgr, template, roi_margin=230, search_radius=110): ejecuta el pipeline completo sobre una imagen: detecta K primero y luego procesa C, M y Y alrededor de esa referencia.
+
+Además, __init__.py solo reexporta las funciones anteriores para que el resto del proyecto las importe desde un solo lugar.
