@@ -22,8 +22,7 @@ import matplotlib.pyplot as plt
 from config import (
     CMY_CROP_RANGES, COLORS_LABEL, offsets_label,
     distancia_camara_plano_mm, focal_mm, sensor_width_mm,
-    APPLY_SHARPENING, SHARPENING_STRENGTH, SIZE_ADAPTIVE_ENABLED, MIN_ROI_MARGIN,
-MIN_SEARCH_RADIUS, 
+    APPLY_SHARPENING, SHARPENING_STRENGTH, SIZE_ADAPTIVE_ENABLED, MIN_ROI_MARGIN, MIN_SEARCH_RADIUS, FACTOR_CORRECION_MM,
 )
 from image_utils import (
     sharpen_image, preprocess_image,
@@ -181,7 +180,7 @@ def guardar_imagen_calculos(img_bgr, cmyk_marks, k_marks, output_dir,
     
     # ✓ Usar distancia personalizada o la de config
     dist_cam_plano = distancia_camara_plano_mm_custom if distancia_camara_plano_mm_custom is not None else distancia_camara_plano_mm
-    mm_por_px = (sensor_width_mm * dist_cam_plano) / (focal_mm * image_width_px)
+    mm_por_px = ((sensor_width_mm * dist_cam_plano) / (focal_mm * image_width_px)) * FACTOR_CORRECION_MM
 
     positions_mm = {}
     for ch in ['C', 'M', 'Y', 'K']:
@@ -201,10 +200,11 @@ def guardar_imagen_calculos(img_bgr, cmyk_marks, k_marks, output_dir,
             if positions_mm.get(ch):
                 dx_px = positions_mm[ch][0] - kx
                 dy_px = positions_mm[ch][1] - ky
+                # calcula la distancia euclidiana entre dos puntos
                 dist_px = np.hypot(dx_px, dy_px)
-                dx_mm   = (dx_px * tamano_pixel_mm * dist_cam_plano) / focal_mm  # ✓ USAR dist_cam_plano
-                dy_mm   = (dy_px * tamano_pixel_mm * dist_cam_plano) / focal_mm  # ✓ USAR dist_cam_plano
-                dist_mm = (dist_px * tamano_pixel_mm * dist_cam_plano) / focal_mm  # ✓ USAR dist_cam_plano
+                dx_mm   = ((dx_px * tamano_pixel_mm * dist_cam_plano) / focal_mm) * FACTOR_CORRECION_MM  # ✓ USAR dist_cam_plano
+                dy_mm   = ((dy_px * tamano_pixel_mm * dist_cam_plano) / focal_mm) * FACTOR_CORRECION_MM  # ✓ USAR dist_cam_plano
+                dist_mm = ((dist_px * tamano_pixel_mm * dist_cam_plano) / focal_mm) * FACTOR_CORRECION_MM  # ✓ USAR dist_cam_plano
                 info_lines.append(f'  {ch}-K:  Δx={dx_mm:+.3f} mm,  Δy={dy_mm:+.3f} mm,  dist={dist_mm:.3f} mm  ({dist_px:.1f} px)')
             else:
                 info_lines.append(f'  {ch}: no disponible')
@@ -217,7 +217,7 @@ def guardar_imagen_calculos(img_bgr, cmyk_marks, k_marks, output_dir,
             dx = positions_mm[n1][0] - positions_mm[n2][0]
             dy = positions_mm[n1][1] - positions_mm[n2][1]
             dist_px = np.hypot(dx, dy)
-            dist_mm = (dist_px * tamano_pixel_mm * dist_cam_plano) / focal_mm  # ✓ USAR dist_cam_plano
+            dist_mm = ((dist_px * tamano_pixel_mm * dist_cam_plano) / focal_mm) * FACTOR_CORRECION_MM  # ✓ USAR dist_cam_plano
             info_lines.append(f'  {n1}-{n2}:  {dist_mm:.3f} mm  ({dist_px:.1f} px)')
 
     font_c  = cv2.FONT_HERSHEY_SIMPLEX
@@ -312,7 +312,7 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
 
     # ✓ CALCULAR mm_por_px según el método elegido
     if calibration_method == 'distance':
-        mm_por_px = (tamano_pixel_mm * dist_cam_plano) / focal_mm
+        mm_por_px = ((tamano_pixel_mm * dist_cam_plano) / focal_mm) * FACTOR_CORRECION_MM
         calib_info = f'Dist. camara-plano: {dist_cam_plano} mm | Focal: {focal_mm} mm'
     
     elif calibration_method == 'reference_size':
@@ -384,7 +384,7 @@ def procesar_y_guardar_imagen(img_path, template, output_dir, show_diagnostics=T
         )
         
         # Filtrar: solo incluir si >= 800 píxeles
-        if len(diag_data) > 0 and diag_data[0].get('px_count', 0) >= 800:
+        if len(diag_data) > 0 and diag_data[0].get('px_count', 0) >= 400:
             cmyk_marks[ch_name] = marks_canal
             diag_por_canal[ch_name] = diag_data
         else:

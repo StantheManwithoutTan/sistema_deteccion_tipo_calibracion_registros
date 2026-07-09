@@ -102,6 +102,7 @@ python main_single.py --imagen foto_real_empresa.jpg
 
 # Con distancia personalizada (150 mm)
 python main_single.py --imagen 20250925_142228.jpg --calib_method distance --distancia_mm 150
+python main_single.py --imagen antes_calib_1.jpg --calib_method distance --distancia_mm 100
 
 # Con tamaño de referencia (marca K = 10 mm)
 python main_single.py --imagen 20250925_142228.jpg --calib_method reference_size --ref_size_mm 10

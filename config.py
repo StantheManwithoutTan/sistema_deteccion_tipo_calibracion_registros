@@ -45,9 +45,10 @@ COLORS_LABEL = {
 offsets_label = {'C': (-80, -30), 'M': (15, -30), 'Y': (-80, 40), 'K': (15, 40)}
 
 # Parámetros ópticos
-distancia_camara_plano_mm = 110
-focal_mm = 4.0
-sensor_width_mm = 5.6
+distancia_camara_plano_mm = 100
+focal_mm = 4.4
+sensor_width_mm = 5.37
+FACTOR_CORRECION_MM = 0.934
 
 # ── Sharpening ─────────────────────────────────────────────────────────────
 # Activar/desactivar el filtro de sharpening al cargar cada imagen.
@@ -81,3 +82,4 @@ MIN_ROI_MARGIN        = 150   # px — nunca menos que esto
 MIN_SEARCH_RADIUS     = 80    # px — nunca menos que esto
 PX_MIN_ACCEPT_LOW     = 200
 SCORE_NORMALIZER_LOW  = 50
+
