@@ -1,6 +1,13 @@
 *.jpg
 *.png
+*.txt
+*.pkl
 
 resultados/
 resultados_v3/
 resultados_v4/
+.ipynb_checkpoints/
+
+reporte_analisis/
+reporte_analisis_2_a_10/
+reporte_analisis_real/
