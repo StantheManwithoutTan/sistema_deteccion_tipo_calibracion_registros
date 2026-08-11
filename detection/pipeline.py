@@ -39,8 +39,7 @@ def detectar_canal_con_imagen_separada(img_bgr, ch_name, ch_info, k_marks,
             max_tolerance=WHITE_TOLERANCE_MAX,
             sigma_factor=WHITE_SIGMA_FACTOR
         )
-        img_isolated, mask_full, mask_near, crop_enhanced, diag_masks = \
-            crear_imagen_canal_color(crop_bgr, ch_name, ch_info, k_local_cx, k_local_cy, search_radius)
+        img_isolated, mask_full, mask_near, crop_enhanced, diag_masks = crear_imagen_canal_color(crop_bgr, ch_name, ch_info, k_local_cx, k_local_cy, search_radius)
 
         # 3. Análisis de color
         rgb_color, hsv_color, px_count = get_representative_color(mask_near, crop_bgr)
