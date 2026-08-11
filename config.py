@@ -16,7 +16,7 @@ CMY_CROP_RANGES = {
             (np.array([  0, 50, 30]), np.array([ 15, 255, 255])),  # rojo-magenta (ampliado v3.2)
             (np.array([160, 30, 30]), np.array([179, 255, 255])),  # magenta-rojo wrap (ampliado)
             (np.array([130, 25, 25]), np.array([165, 255, 255])),  # magenta puro (ampliado)
-            (np.array([140, 15, 15]), np.array([179, 120, 200])),  # magenta diluido/muy desaturado
+            (np.array([140, 30, 30]), np.array([179, 179, 190])),  # magenta diluido/muy desaturado
         ],
         'label_color': (255, 0, 255),
         'nombre': 'Magenta',
@@ -27,7 +27,7 @@ CMY_CROP_RANGES = {
     'Y': {
         'hsv_ranges': [
             (np.array([10,  8, 20]), np.array([45, 255, 220])),    # amarillo puro a diluido
-            (np.array([ 5,  5, 15]), np.array([55, 160, 180])),   # amarillo muy desaturado/oscuro
+            (np.array([ 5,  30, 65]), np.array([48, 160, 180])),   # amarillo muy desaturado/oscuro
             (np.array([15, 15, 10]), np.array([38,  80, 140])),   # amarillo mezclado con K
         ],
         'label_color': (0, 255, 255),
@@ -82,4 +82,9 @@ MIN_ROI_MARGIN        = 150   # px — nunca menos que esto
 MIN_SEARCH_RADIUS     = 80    # px — nunca menos que esto
 PX_MIN_ACCEPT_LOW     = 200
 SCORE_NORMALIZER_LOW  = 50
+
+
+GRAY_EXCLUSION_ENABLED = True
+GRAY_CROMA_MAX = 22     # |a−128|+|b−128| por debajo = casi neutro
+GRAY_L_MAX     = 80     # y adicionalmente oscuro (no papel blanco)
 

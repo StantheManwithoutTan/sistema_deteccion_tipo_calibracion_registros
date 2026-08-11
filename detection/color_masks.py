@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from config import GRAY_EXCLUSION_ENABLED, GRAY_CROMA_MAX, GRAY_L_MAX
 
 
 
@@ -28,6 +29,16 @@ def crear_imagen_canal_color(crop_bgr, ch_name, ch_info, k_local_cx, k_local_cy,
     # --- Preprocesamiento LAB + CLAHE ---
     crop_lab_color = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2LAB)
     L_ch, a_ch, b_ch = cv2.split(crop_lab_color)
+
+
+    a_s = a_ch.astype(np.int16)
+    b_s = b_ch.astype(np.int16)
+    dist_acromatica = np.abs(a_s - 128) + np.abs(b_s - 128)
+    # Gris oscuro: poca croma (a,b≈128) y Lajo ─ excluir como marca de color
+    gris_oscuro = ((dist_acromatica < 40) & (L_ch < 60)).astype(np.uint8) * 255
+    # Atención: 40 cubre Y_gris(7+6=13) y M_gris(2+1=9); NO cubre Y oscuro legítimo (b=176)
+
+
     clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(4, 4))
     L_eq = clahe.apply(L_ch)
     crop_enhanced_bgr = cv2.cvtColor(cv2.merge((L_eq, a_ch, b_ch)), cv2.COLOR_LAB2BGR)
@@ -42,6 +53,10 @@ def crear_imagen_canal_color(crop_bgr, ch_name, ch_info, k_local_cx, k_local_cy,
     mask_hsv_sin_boost = np.zeros((crop_h, crop_w), dtype=np.uint8)
     mask_lab_bgr       = np.zeros((crop_h, crop_w), dtype=np.uint8)
     color_mask         = np.zeros((crop_h, crop_w), dtype=np.uint8)
+
+    croma = (a_ch.astype(np.int16) - 128).__abs__() + (b_ch.astype(np.int16) - 128).__abs__()
+    if GRAY_EXCLUSION_ENABLED:
+        mascara_gris = ((croma < GRAY_CROMA_MAX) & (L_ch < GRAY_L_MAX)).astype(np.uint8) * 255
 
     # ================================================================
     # ALGORITMO HÍBRIDO EXCLUSIVO POR CANAL
@@ -95,15 +110,23 @@ def crear_imagen_canal_color(crop_bgr, ch_name, ch_info, k_local_cx, k_local_cy,
         mask_lab_bgr = mask_magenta_gray.astype(np.uint8)
         color_mask   = cv2.bitwise_or(color_mask, mask_lab_bgr)
 
+        # Excluye valores oscuros del LAB
+        color_mask = cv2.bitwise_and(color_mask, cv2.bitwise_not(gris_oscuro))
+        color_mask = cv2.bitwise_and(color_mask, cv2.bitwise_not(mascara_gris))
+
     elif ch_name == 'Y':  # AMARILLO: HSV + LAB (b* alto + a* cálido)
         for (lower, upper) in ch_info['hsv_ranges']:
             mask_hsv_sin_boost = cv2.bitwise_or(mask_hsv_sin_boost,
                                                  cv2.inRange(crop_hsv, lower, upper))
         mask_lab_bgr = cv2.bitwise_and(  # ← Asignar a mask_lab_bgr directamente
             cv2.inRange(b_ch, np.array([132]), np.array([255])),
-            cv2.inRange(a_ch, np.array([110]), np.array([145])))
+            cv2.inRange(a_ch, np.array([110]), np.array([145]))
+        )
+        mask_lab_bgr = cv2.bitwise_and(mask_lab_bgr, cv2.bitwise_not(gris_oscuro))
 
         color_mask = mask_lab_bgr.copy()
+        color_mask = cv2.bitwise_and(color_mask, cv2.bitwise_not(mascara_gris))
+
 
     # --- Limpieza morfológica ---
     color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
