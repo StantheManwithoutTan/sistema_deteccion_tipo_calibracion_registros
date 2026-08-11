@@ -121,6 +121,20 @@ python main_single.py --imagen 20250925_142228.jpg --canales Y
 python main_single.py --imagen 20260315_235619.jpg --canales Y
 
 
+
+python main_single.py --batch --peores_por_color --input_dir "...\registro_dataset_1_8_26_v4_2_a_10_4k" --output_dir "resultados_peores_4k" --top_n 5
+
+python main_single.py --batch --input_dir "..\CREACION_DATASET_SINTETICO_TESIS\registro_dataset_7_8_26_colores_aleatorios" --output_dir "resultados_col_aleatorios_completos" 
+
+
+
+
+
+python main_single.py --peores_por_color --input_dir "..\CREACION_DATASET_SINTETICO_TESIS\registro_dataset_1_8_26_v4_2_a_10_4k" --output_dir "resultados_peores_4k" --top_n 5
+
+python main_single.py --peores_por_color --input_dir "..\CREACION_DATASET_SINTETICO_TESIS\registro_dataset_7_8_26_colores_aleatorios" --output_dir "resultados_peores_colores_aleatorios" --top_n 5
+
+
 ```
 
 Esto abre las ventanas de matplotlib con los diagnósticos de máscaras,
@@ -132,6 +146,8 @@ igual que ejecutar el notebook celda por celda.
 python main_batch.py --input_dir . --output_dir resultados_v3
 
 python main_single.py --batch --input_dir . --output_dir ./resultados_grayscale_magenta
+
+python main_single.py --batch --input_dir "..\CREACION_DATASET_SINTETICO_TESIS\registro_dataset_1_8_26_v4_2_a_10_4k" --output_dir "resultados_total_4k"
 ```
 
 Guarda en `resultados_v3/` tres archivos por imagen:
