@@ -46,8 +46,7 @@ def detectar_canal_con_imagen_separada(img_bgr, ch_name, ch_info, k_marks,
         hue_analysis = analyze_hue_range(cv2.cvtColor(crop_enhanced, cv2.COLOR_BGR2HSV), mask_near, ch_info)
 
         # 4. Detectar posición (EXTRACCIÓN 1)
-        best_cx, best_cy, best_score, best_scale, method_used, xs, ys = \
-            detectar_posicion(mask_near, img_isolated, template,
+        best_cx, best_cy, best_score, best_scale, method_used, xs, ys = detectar_posicion(mask_near, img_isolated, template,
                               kcx, kcy, kscale, rx1, ry1, k_local_cx, k_local_cy,
                               threshold, score_normalizer, px_count)
         marks_canal.append((best_cx, best_cy, best_score, best_scale))

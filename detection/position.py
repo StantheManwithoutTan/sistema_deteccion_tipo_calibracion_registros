@@ -40,8 +40,10 @@ def detectar_posicion(mask_near, img_isolated, template,
             best_score, best_scale = dscore, dscale
             method_used = 'template_img_separada'
 
+    # Extrae las coordenadas locales de todos los pixeles de la mascara de color
     ys, xs = np.where(mask_near > 0)
     if method_used == 'prediccion' and len(xs) > 0:
+        # A: fallback invariante a K — mean-shift desde el centroide simple
         dists   = np.hypot(xs - k_local_cx, ys - k_local_cy)
         weights = np.exp(-dists / 20.0)
         best_cx = int(np.average(xs, weights=weights)) + rx1
@@ -51,14 +53,14 @@ def detectar_posicion(mask_near, img_isolated, template,
         method_used = 'centroide_ponderado'
 
     if len(xs) > 0:
+        # B: no sobrescribir el template — solo refinar local (sigma ~10px)
         dists_fin   = np.hypot(xs - k_local_cx, ys - k_local_cy)
         weights_fin = np.exp(-dists_fin / CLUSTERING_SIGMA)
         best_cx     = int(weighted_median(xs, weights_fin)) + rx1
         best_cy     = int(weighted_median(ys, weights_fin)) + ry1
         method_used += '+mediana_ponderada'
-
+        
     return best_cx, best_cy, best_score, best_scale, method_used, xs, ys
-
 
 def compute_detect_radius(xs, ys, best_cx, best_cy, best_scale, rx1, ry1):
     """
